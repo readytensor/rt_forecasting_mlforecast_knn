@@ -1,7 +1,7 @@
 {
   "history_forecast_ratio": null,
   "lags_forecast_ratio": 4,
-  "n_neighbors": 1,
+  "n_neighbors": 3,
   "use_exogenous": true,
   "random_state": 0
   
