@@ -150,7 +150,7 @@ class Forecaster:
         if self.history_length:
             for index, series in enumerate(all_series):
                 all_series[index] = series.iloc[-self.history_length :]
-            data = pd.concat(all_series)
+            data = pd.concat(all_series).drop(columns="index")
 
         if not self.use_exogenous:
             if self.data_schema.future_covariates:
