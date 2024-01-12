@@ -142,6 +142,16 @@ class Forecaster:
                 data[self.data_schema.time_col]
             )
 
+        groups_by_ids = data.groupby(self.data_schema.id_col)
+        all_ids = list(groups_by_ids.groups.keys())
+
+        all_series = [groups_by_ids.get_group(id_).reset_index() for id_ in all_ids]
+
+        if self.history_length:
+            for index, series in enumerate(all_series):
+                all_series[index] = series.iloc[-self.history_length :]
+            data = pd.concat(all_series)
+
         if not self.use_exogenous:
             if self.data_schema.future_covariates:
                 data.drop(columns=self.data_schema.future_covariates, inplace=True)
