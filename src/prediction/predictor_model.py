@@ -3,17 +3,20 @@ import warnings
 import joblib
 import numpy as np
 import pandas as pd
-from typing import Optional, Iterable
+from typing import Optional, Iterable, Union
 from schema.data_schema import ForecastingSchema
 from sklearn.exceptions import NotFittedError
 from mlforecast import MLForecast
 from sklearn.neighbors import KNeighborsRegressor
 from mlforecast.target_transforms import LocalMinMaxScaler
 
+from logger import get_logger
+
 warnings.filterwarnings("ignore")
 
 
 PREDICTOR_FILE_NAME = "predictor.joblib"
+logger = get_logger(task_name="model_training")
 
 
 class Forecaster:
@@ -29,7 +32,7 @@ class Forecaster:
         self,
         data_schema: ForecastingSchema,
         history_forecast_ratio: int = None,
-        lags_forecast_ratio: int = None,
+        lags_forecast_ratio: Union[int, float] = None,
         lags: Optional[Iterable] = None,
         n_neighbors: int = 5,
         use_exogenous: bool = True,
@@ -77,22 +80,15 @@ class Forecaster:
             )
 
         if lags_forecast_ratio:
-            lags = lags_forecast_ratio * self.data_schema.forecast_length
+            lags = int(lags_forecast_ratio * self.data_schema.forecast_length)
             self.lags = [i for i in range(1, lags + 1)]
 
-        models = [
+        self.models = [
             KNeighborsRegressor(
                 n_neighbors=n_neighbors,
                 **kwargs,
             )
         ]
-
-        self.model = MLForecast(
-            models=models,
-            freq=self.map_frequency(data_schema.frequency),
-            lags=self.lags,
-            target_transforms=[LocalMinMaxScaler()],
-        )
 
     def map_frequency(self, frequency: str) -> str:
         """
@@ -159,6 +155,16 @@ class Forecaster:
             if self.data_schema.static_covariates:
                 data.drop(columns=self.data_schema.static_covariates, inplace=True)
 
+        series_length = (
+            data.groupby(self.data_schema.id_col)[self.data_schema.target]
+            .count()
+            .iloc[0]
+        )
+        if series_length < 2 * self.data_schema.forecast_length:
+            raise ValueError(
+                f"Training series is too short. History should be at least double the forecast horizon. history_length = ({series_length}), forecast horizon = ({self.data_schema.forecast_length})"
+            )
+
         return data
 
     def fit(
@@ -175,11 +181,23 @@ class Forecaster:
 
         if self.use_exogenous and len(self.data_schema.static_covariates) > 0:
             static_features = self.data_schema.static_covariates
-
         else:
             static_features = []
 
         history = self.prepare_data(history)
+
+        if self.lags[-1] > len(history):
+            self.lags = [i for i in range(1, len(history))]
+            logger.warning(
+                f"The provided lags value is greater than the available history length. Lags are set to to history length = {len(history)}"
+            )
+
+        self.model = MLForecast(
+            models=self.models,
+            freq=self.map_frequency(self.data_schema.frequency),
+            lags=self.lags,
+            target_transforms=[LocalMinMaxScaler()],
+        )
 
         self.model.fit(
             df=history,
