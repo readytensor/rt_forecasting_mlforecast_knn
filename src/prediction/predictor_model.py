@@ -68,6 +68,7 @@ class Forecaster:
         """
         self.data_schema = data_schema
         self.lags = lags
+        self.n_neighbors = n_neighbors
         self.use_exogenous = use_exogenous
         self.random_state = random_state
         self._is_trained = False
@@ -82,13 +83,6 @@ class Forecaster:
         if lags_forecast_ratio:
             lags = int(lags_forecast_ratio * self.data_schema.forecast_length)
             self.lags = [i for i in range(1, lags + 1)]
-
-        self.models = [
-            KNeighborsRegressor(
-                n_neighbors=n_neighbors,
-                **kwargs,
-            )
-        ]
 
     def map_frequency(self, frequency: str) -> str:
         """
@@ -144,6 +138,10 @@ class Forecaster:
             logger.warning(
                 f"The provided lags value >= available history length. Lags are set to to (history length - 1) = {series_length-1}"
             )
+            logger.warn(
+                "The provided data contains one training sample. n_neighbors is set to 1"
+            )
+            self.n_neighbors = 1
 
     def prepare_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """
@@ -206,11 +204,12 @@ class Forecaster:
 
         self._validate_lags_and_history_length(series_length=series_length)
 
-        if self.lags[-1] > len(history):
-            self.lags = [i for i in range(1, len(history))]
-            logger.warning(
-                f"The provided lags value is greater than the available history length. Lags are set to to history length = {len(history)}"
+        self.models = [
+            KNeighborsRegressor(
+                n_neighbors=self.n_neighbors,
+                **self.kwargs,
             )
+        ]
 
         self.model = MLForecast(
             models=self.models,
