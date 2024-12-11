@@ -1,8 +1,7 @@
 {
-  "history_forecast_ratio": null,
+  "history_forecast_ratio": 15,
   "lags_forecast_ratio": 4,
-  "n_neighbors": 3,
+  "n_neighbors": 5,
   "use_exogenous": true,
   "random_state": 0
-  
 }
