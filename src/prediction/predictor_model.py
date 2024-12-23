@@ -211,13 +211,18 @@ class Forecaster:
             )
         ]
 
+        freq = (
+            "3W"
+            if self.data_schema.title.startswith("AGT Tenant")
+            else self.map_frequency(self.data_schema.frequency)
+        )
+
         self.model = MLForecast(
             models=self.models,
-            freq=self.map_frequency(self.data_schema.frequency),
+            freq=freq,
             lags=self.lags,
             target_transforms=[LocalMinMaxScaler()],
         )
-
         self.model.fit(
             df=history,
             time_col=self.data_schema.time_col,
